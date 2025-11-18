@@ -1,0 +1,42 @@
+name: cab_booking
+description: "Cab Booking App."
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.0
+
+
+dependencies:
+  flutter:
+    sdk: flutter
+  carousel_slider: ^5.1.1
+  intl: ^0.19.0
+  iconsax: ^0.0.8
+  get: ^4.7.2
+  introduction_screen: ^3.1.17
+  geolocator: ^14.0.2
+  permission_handler: ^11.3.1
+  http: ^1.5.0
+  google_maps_flutter: ^2.13.1
+  flutter_typeahead: ^5.2.0
+  flutter_google_places_sdk: ^0.3.6
+  cached_network_image: ^3.3.1
+
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+
