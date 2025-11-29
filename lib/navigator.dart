@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
+import 'Features/booking_show/screens/booking_show.dart';
 import 'Features/dashboard/screens/home.dart';
 
 class NavigationMenu extends StatefulWidget {
@@ -12,9 +13,10 @@ class NavigationMenu extends StatefulWidget {
 class _NavigationMenuState extends State<NavigationMenu> {
   int _selectedIndex = 0;
 
+  // Screens to show in each tab
   final List<Widget> _screens = [
     const Dashboard(),
-    const Center(child: Text("Services Coming Soon")),
+    const BookingListPage(),
     const Center(child: Text("My Bookings")),
     const Center(child: Text("Profile")),
   ];
@@ -24,7 +26,7 @@ class _NavigationMenuState extends State<NavigationMenu> {
     return Scaffold(
       backgroundColor: Colors.grey[100],
 
-      // 🌟 Enhanced Bottom Navigation Bar
+      // Bottom Navigation Bar
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -47,8 +49,8 @@ class _NavigationMenuState extends State<NavigationMenu> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildNavItem(Iconsax.home, "Home", 0),
-                _buildNavItem(Iconsax.shop, "Service", 1),
-                _buildNavItem(Iconsax.heart, "Bookings", 2),
+                _buildNavItem(Iconsax.shop, "Bookings", 1),
+                _buildNavItem(Iconsax.heart, "Service", 2),
                 _buildNavItem(Iconsax.user, "Profile", 3),
               ],
             ),
@@ -56,15 +58,15 @@ class _NavigationMenuState extends State<NavigationMenu> {
         ),
       ),
 
-      // 🌟 Screen Switch Animation
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 400),
-        child: _screens[_selectedIndex],
+      // Body using IndexedStack to preserve state
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: _screens,
       ),
     );
   }
 
-  // 🌟 Custom Navigation Button
+  // Bottom navigation item
   Widget _buildNavItem(IconData icon, String label, int index) {
     final bool isSelected = _selectedIndex == index;
 
@@ -82,7 +84,7 @@ class _NavigationMenuState extends State<NavigationMenu> {
           boxShadow: isSelected
               ? [
             BoxShadow(
-              color: Colors.black.withOpacity(0.3),
+              color: Colors.deepOrange.withOpacity(0.3),
               blurRadius: 8,
               offset: const Offset(0, 3),
             ),

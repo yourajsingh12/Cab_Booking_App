@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -22,24 +23,44 @@ class MatchController extends GetxController {
   final RxString fromAddress = ''.obs;
   final RxString toAddress = ''.obs;
 
-  /// Distance
-  final RxString distanceText = ''.obs;  // e.g. "12.4 km"
+  final RxString distanceText = ''.obs;
   final RxDouble distanceValue = 0.0.obs;
 
-  final String apiKey = 'AIzaSyDgx4T1sLieAkSh9wvvZfUalG0LrMF7lUg';
+  final RxList<String> directionsSteps = <String>[].obs;
+
+  final RxList<LatLng> polylineCoords = <LatLng>[].obs;
+  final Rx<LatLng?> cabPosition = Rx<LatLng?>(null);
 
   var isUsingCurrentLocation = false.obs;
 
+  final String apiKey = 'AIzaSyDgx4T1sLieAkSh9wvvZfUalG0LrMF7lUg';
+
+  Timer? _timer;
+  int polyIndex = 0;
+
+  // ✅ ADDED — date & time fields
+  final Rx<DateTime?> selectedDate = Rx<DateTime?>(DateTime.now());
+  final Rx<TimeOfDay?> selectedTime = Rx<TimeOfDay?>(TimeOfDay.now());
+
+  void setDate(DateTime date) {
+    selectedDate.value = date;
+  }
+
+  void setTime(TimeOfDay time) {
+    selectedTime.value = time;
+  }
+
+  // CLEAR FROM LOCATION
   void clearFromLocation() {
     fromController.clear();
     fromAddress.value = "";
     selectedFromLatLng.value = null;
     isUsingCurrentLocation.value = false;
     fromSuggestions.clear();
+    directionsSteps.clear();
   }
 
-
-  /// ---------------------- CURRENT LOCATION --------------------------
+  // ---------------- CURRENT LOCATION ----------------
   Future<void> fetchCurrentLocation() async {
     try {
       LocationPermission permission = await Geolocator.checkPermission();
@@ -52,7 +73,8 @@ class MatchController extends GetxController {
         }
       }
 
-      Get.dialog(const Center(child: CircularProgressIndicator()), barrierDismissible: false);
+      Get.dialog(const Center(child: CircularProgressIndicator()),
+          barrierDismissible: false);
 
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.best,
@@ -62,6 +84,7 @@ class MatchController extends GetxController {
         position.latitude,
         position.longitude,
       );
+
       isUsingCurrentLocation.value = true;
       fromAddress.value = address;
       selectedFromLatLng.value = LatLng(position.latitude, position.longitude);
@@ -75,12 +98,13 @@ class MatchController extends GetxController {
     }
   }
 
-  /// ---------------------- AUTOCOMPLETE -----------------------------
+  // ---------------- AUTOCOMPLETE ----------------
   Future<void> getFromSuggestions(String input) async {
     if (input.isEmpty) {
       fromSuggestions.clear();
       return;
     }
+
     final url =
         'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=$input&key=$apiKey';
 
@@ -89,8 +113,9 @@ class MatchController extends GetxController {
       final data = jsonDecode(response.body);
 
       if (data['status'] == 'OK') {
-        fromSuggestions.value =
-        List<String>.from(data['predictions'].map((p) => p['description']));
+        fromSuggestions.value = List<String>.from(
+          data['predictions'].map((p) => p['description']),
+        );
       } else {
         fromSuggestions.clear();
       }
@@ -104,6 +129,7 @@ class MatchController extends GetxController {
       toSuggestions.clear();
       return;
     }
+
     final url =
         'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=$input&key=$apiKey';
 
@@ -112,8 +138,9 @@ class MatchController extends GetxController {
       final data = jsonDecode(response.body);
 
       if (data['status'] == 'OK') {
-        toSuggestions.value =
-        List<String>.from(data['predictions'].map((p) => p['description']));
+        toSuggestions.value = List<String>.from(
+          data['predictions'].map((p) => p['description']),
+        );
       } else {
         toSuggestions.clear();
       }
@@ -122,7 +149,7 @@ class MatchController extends GetxController {
     }
   }
 
-  /// ---------------------- SELECT FROM ------------------------------
+  // ---------------- SELECT FROM ----------------
   Future<void> selectFromSuggestion(String place) async {
     fromController.text = place;
     fromSuggestions.clear();
@@ -130,16 +157,17 @@ class MatchController extends GetxController {
     final location = await locationService.getLatLngFromPlace(place);
     if (location != null) {
       selectedFromLatLng.value = location;
+
       fromAddress.value = await locationService.reverseGeocode(
         location.latitude,
         location.longitude,
       );
     }
 
-    _calculateDistanceIfPossible();
+    _calculateDistanceAndPolyline();
   }
 
-  /// ---------------------- SELECT TO -------------------------------
+  // ---------------- SELECT TO ----------------
   Future<void> selectToSuggestion(String place) async {
     toController.text = place;
     toSuggestions.clear();
@@ -147,28 +175,59 @@ class MatchController extends GetxController {
     final location = await locationService.getLatLngFromPlace(place);
     if (location != null) {
       selectedToLatLng.value = location;
+
       toAddress.value = await locationService.reverseGeocode(
         location.latitude,
         location.longitude,
       );
     }
 
-    _calculateDistanceIfPossible();
+    _calculateDistanceAndPolyline();
   }
 
-  /// ---------------------- CALCULATE DISTANCE ----------------------
-  Future<void> _calculateDistanceIfPossible() async {
-    if (selectedFromLatLng.value != null &&
-        selectedToLatLng.value != null) {
-      final distance = await locationService.getDistance(
-        selectedFromLatLng.value!,
-        selectedToLatLng.value!,
-      );
+  // ---------------- CALCULATE DISTANCE + ROUTE ----------------
+  Future<void> _calculateDistanceAndPolyline() async {
+    if (selectedFromLatLng.value == null ||
+        selectedToLatLng.value == null) return;
 
-      if (distance != null) {
-        distanceText.value = distance['text'];     // "12.4 km"
-        distanceValue.value = distance['value'];   // metres
+    final directions = await locationService.getDirections(
+      selectedFromLatLng.value!,
+      selectedToLatLng.value!,
+      apiKey,
+    );
+
+    if (directions != null) {
+      polylineCoords.value = directions['polyline'];
+      directionsSteps.value = directions['steps'];
+      distanceText.value = directions['distanceText'];
+      distanceValue.value = directions['distanceValue'];
+
+      if (polylineCoords.isNotEmpty) {
+        cabPosition.value = polylineCoords.first;
+        _startCabAnimation();
       }
     }
+  }
+
+  // ---------------- CAB ANIMATION ----------------
+  void _startCabAnimation() {
+    polyIndex = 0;
+
+    _timer?.cancel();
+    _timer =
+        Timer.periodic(const Duration(milliseconds: 900), (Timer timer) {
+          if (polyIndex < polylineCoords.length) {
+            cabPosition.value = polylineCoords[polyIndex];
+            polyIndex++;
+          } else {
+            timer.cancel();
+          }
+        });
+  }
+
+  @override
+  void onClose() {
+    _timer?.cancel();
+    super.onClose();
   }
 }

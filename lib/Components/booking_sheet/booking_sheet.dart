@@ -3,10 +3,11 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../Controller/locationController.dart';
+import '../../Features/cabListPage/model/cabModel.dart';
 import '../../Features/cabListPage/screens/cabListPage.dart';
 
 class BookingSheet extends StatefulWidget {
-  final List<String> carList;
+  final List<CabModel> carList;
   const BookingSheet({super.key, required this.carList});
 
   @override
@@ -17,6 +18,29 @@ class _BookingSheetState extends State<BookingSheet> {
   final MatchController matchController = Get.put(MatchController());
   DateTime? pickupDate;
   TimeOfDay? pickupTime;
+
+  // Validation Errors
+  String? dateError;
+  String? timeError;
+
+
+  bool validateDateTime() {
+    setState(() {
+      dateError = pickupDate == null ? "Please select pickup date" : null;
+      timeError = pickupTime == null ? "Please select pickup time" : null;
+    });
+
+    if (dateError != null || timeError != null) {
+      Get.snackbar(
+        "Missing Information",
+        "Please select date and time",
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+      );
+      return false;
+    }
+    return true;
+  }
 
   @override
   void initState() {
@@ -57,7 +81,7 @@ class _BookingSheetState extends State<BookingSheet> {
               const SizedBox(height: 20),
               const Center(
                 child: Text(
-                  "Book Your Ride 🚖",
+                  "Book Your Ride",
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -68,7 +92,6 @@ class _BookingSheetState extends State<BookingSheet> {
 
               const SizedBox(height: 20),
 
-              /// From Location with GPS → Cross icon
               _fromLocationField(),
 
               const SizedBox(height: 15),
@@ -89,9 +112,25 @@ class _BookingSheetState extends State<BookingSheet> {
               const SizedBox(height: 15),
 
               _datePicker(context),
+              if (dateError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 5, left: 5),
+                  child: Text(dateError!,
+                      style: const TextStyle(
+                          color: Colors.red, fontSize: 12)),
+                ),
+
               const SizedBox(height: 15),
 
               _timePicker(context),
+              if (timeError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 5, left: 5),
+                  child: Text(timeError!,
+                      style: const TextStyle(
+                          color: Colors.red, fontSize: 12)),
+                ),
+
               const SizedBox(height: 20),
 
               /// Confirm Button
@@ -99,6 +138,8 @@ class _BookingSheetState extends State<BookingSheet> {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
+                    if (!validateDateTime()) return;
+
                     final dist = matchController.distanceText.value;
                     final send = (dist == '' ||
                         dist == 'Calculating...' ||
@@ -148,7 +189,6 @@ class _BookingSheetState extends State<BookingSheet> {
               labelText: "From Location",
               prefixIcon: const Icon(Icons.location_on_outlined),
 
-              /// CHANGING ICON BASED ON CURRENT LOCATION
               suffixIcon: matchController.isUsingCurrentLocation.value
                   ? IconButton(
                 icon: const Icon(Icons.close, color: Colors.red),
@@ -157,7 +197,8 @@ class _BookingSheetState extends State<BookingSheet> {
                 },
               )
                   : IconButton(
-                icon: const Icon(Icons.gps_fixed, color: Colors.yellow),
+                icon:
+                const Icon(Icons.gps_fixed, color: Colors.yellow),
                 onPressed: () {
                   matchController.fetchCurrentLocation();
                 },
@@ -175,7 +216,6 @@ class _BookingSheetState extends State<BookingSheet> {
             },
           ),
 
-          /// Suggestions
           if (matchController.fromSuggestions.isNotEmpty)
             Container(
               margin: const EdgeInsets.only(top: 4),
@@ -190,11 +230,13 @@ class _BookingSheetState extends State<BookingSheet> {
                 shrinkWrap: true,
                 itemCount: matchController.fromSuggestions.length,
                 itemBuilder: (context, index) {
-                  final suggestion = matchController.fromSuggestions[index];
+                  final suggestion =
+                  matchController.fromSuggestions[index];
                   return ListTile(
                     title: Text(suggestion),
                     onTap: () {
-                      matchController.selectFromSuggestion(suggestion);
+                      matchController
+                          .selectFromSuggestion(suggestion);
                       FocusScope.of(context).unfocus();
                     },
                   );
@@ -205,6 +247,7 @@ class _BookingSheetState extends State<BookingSheet> {
       );
     });
   }
+
   // -------------------------
   // GENERIC LOCATION FIELD
   // -------------------------
@@ -266,7 +309,7 @@ class _BookingSheetState extends State<BookingSheet> {
     });
   }
 
-  // DATE PICKER
+  // ------------------ DATE PICKER ------------------
   Widget _datePicker(BuildContext context) {
     return GestureDetector(
       onTap: () async {
@@ -276,7 +319,13 @@ class _BookingSheetState extends State<BookingSheet> {
           firstDate: DateTime.now(),
           lastDate: DateTime(2030),
         );
-        if (picked != null) setState(() => pickupDate = picked);
+
+        if (picked != null) {
+          setState(() {
+            pickupDate = picked;
+            dateError = null;
+          });
+        }
       },
       child: _pickerContainer(
         icon: Icons.calendar_today_outlined,
@@ -287,15 +336,19 @@ class _BookingSheetState extends State<BookingSheet> {
     );
   }
 
-  // TIME PICKER
+  // ------------------ TIME PICKER ------------------
   Widget _timePicker(BuildContext context) {
     return GestureDetector(
       onTap: () async {
-        TimeOfDay? picked = await showTimePicker(
-          context: context,
-          initialTime: TimeOfDay.now(),
-        );
-        if (picked != null) setState(() => pickupTime = picked);
+        TimeOfDay? picked =
+        await showTimePicker(context: context, initialTime: TimeOfDay.now());
+
+        if (picked != null) {
+          setState(() {
+            pickupTime = picked;
+            timeError = null;
+          });
+        }
       },
       child: _pickerContainer(
         icon: Icons.access_time_outlined,
@@ -306,7 +359,10 @@ class _BookingSheetState extends State<BookingSheet> {
     );
   }
 
-  Widget _pickerContainer({required IconData icon, required String text}) {
+  Widget _pickerContainer({
+    required IconData icon,
+    required String text,
+  }) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -318,7 +374,10 @@ class _BookingSheetState extends State<BookingSheet> {
         children: [
           Icon(icon, color: Colors.black),
           const SizedBox(width: 10),
-          Text(text, style: const TextStyle(color: Colors.black)),
+          Text(
+            text,
+            style: const TextStyle(color: Colors.black),
+          ),
         ],
       ),
     );

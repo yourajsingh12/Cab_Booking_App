@@ -1,4 +1,4 @@
-package  com.cab_booking
+package  com.cab.booking
 
 import io.flutter.embedding.android.FlutterActivity
 
